@@ -15,40 +15,126 @@ def main():
     )
 
     parser.add_argument('filename', nargs='*')
-    parser.add_argument('--port1', type=int)
-    parser.add_argument('--port2', type=int)
+    parser.add_argument('--port1', type=int, default=None)
+    parser.add_argument('--port2', type=int, default=None)
+    parser.add_argument('-f', '--force', action='store_true', help='Continue anyway if port-connection check fails')
 
     args = parser.parse_args()
 
     pna = PNA()
     lc = LibreCAL()
 
-    # TODO: auto-detect orientation
-    # TODO: sanity check connections
+    # Disconnect all LibreCAL ports initially
+    for i in range(1, 5):
+        lc.set_port(i, "NONE")
 
     standards = ['SHORT', 'OPEN', 'LOAD', 'THROUGH']
 
-    def measure(standard):
-        if standard == "THROUGH":
-            lc.set_port(args.port1, standard, args.port2)
-        else:
-            lc.set_port(args.port1, standard)
-            lc.set_port(args.port2, standard)
-
+    def measure():
         time.sleep(0.1)
         pna.immediate_trigger()
         pna.wait()
         n = pna.get_snp_data()
-        n.name = standard
         return n
 
-    pna.set_correction_state(False)
+    # Turn off continuous sweep so that we can trigger & collect data on-demand
     pna.set_continuous(False)
-    measured = [measure(standard) for standard in standards]
+
+    # Turn off correction, in case there's a previous calibration active
+    pna.set_correction_state(False)
+
+    # TODO: implement properly by creating temporary S11/S22 measurements for cal
+    pna.write(":CALC:PAR:SEL CH1_S11_1")
+
+    # Detect connected ports
+    port1_candidates = []
+    port2_candidates = []
+    for i in range(1, 5):
+        lc.set_port(i, "OPEN")
+        open = measure()
+        lc.set_port(i, "SHORT")
+        short = measure()
+        lc.set_port(i, "NONE")
+
+        # Calculate phase difference between open/short measurements.
+        # For unconnected ports this should be 0, for connected ones it should be roughly +/-pi
+        s11_diff = open.s11.s*np.conjugate(short.s11.s)
+        s22_diff = open.s22.s*np.conjugate(short.s22.s)
+
+        # Average in the complex plane because the angle could be flipping between +/- pi,
+        # then calculate the angle and take the absolute value
+        s11_phase = np.abs(np.angle(np.average(s11_diff)))
+        s22_phase = np.abs(np.angle(np.average(s22_diff)))
+
+        if s11_phase > np.pi/2:
+            port1_candidates.append(i)
+
+        if s22_phase > np.pi/2:
+            port2_candidates.append(i)
+
+    # Check auto-detected ports against selections, or apply them if no selections
+    def check_ports(port_candidates, port_selected, vna_port_name):
+        # Check if selected port seems to match what we can detect
+        if port_selected:
+            if len(port_candidates) > 1:
+                if args.force:
+                    print(f"WARNING: multiple candidates found for {vna_port_name} ({port_candidates})")
+                    return port_selected
+                else:
+                    print(f"ERROR: multiple candidates found for {vna_port_name} ({port_candidates})")
+                    return -1
+            elif len(port_candidates) == 0:
+                if args.force:
+                    print(f"WARNING: no candidates found for {vna_port_name}")
+                    return port_selected
+                else:
+                    print(f"ERROR: no candidates found for {vna_port_name}")
+                    return -1
+            elif port_candidates[0] != port_selected:
+                if args.force:
+                    print(f"WARNING: {vna_port_name} candidate ({port_candidates[0]}) does not match selection ({port_selected})")
+                    return port_selected
+                else:
+                    print(f"ERROR: {vna_port_name} candidate ({port_candidates[0]}) does not match selection ({port_selected})")
+                    return -1
+            else:
+                return port_selected
+        # Or if no port selected, auto-detect it
+        else:
+            if len(port_candidates) > 1:
+                print(f"ERROR: multiple candidates found for {vna_port_name} ({port_candidates})")
+                return -1
+            elif len(port_candidates) == 0:
+                print(f"ERROR: no candidates found for {vna_port_name}")
+                return -1
+            else:
+                print(f"Auto-detected {vna_port_name} connection to LibreCAL port {port_candidates[0]}")
+                return port_candidates[0]
+    
+    port1_selection = check_ports(port1_candidates, args.port1, "port1")
+    if port1_selection == -1:
+        return
+
+    port2_selection = check_ports(port2_candidates, args.port2, "port2")
+    if port2_selection == -1:
+        return
+
+    # Measure standards
+    measured = []
+    for standard in standards:
+        if standard == "THROUGH":
+            lc.set_port(port1_selection, standard, port2_selection)
+        else:
+            lc.set_port(port1_selection, standard)
+            lc.set_port(port2_selection, standard)
+
+        measured.append(measure())
+
+    # Restart continuous sweep and turn correction back on
     pna.set_continuous(True)
     pna.set_correction_state(True)
 
-    def ideal(standard, port1=1, port2=2):
+    def ideal(standard, port1, port2):
         if standard == "THROUGH":
             if port1 > port2:
                 return lc.get_snp_data(f"P{port2}{port1}_THROUGH").flipped()
@@ -59,7 +145,7 @@ def main():
             s22 = lc.get_snp_data(f"P{port2}_{standard}")
             return skrf.two_port_reflect(s11, s22)
 
-    ideals = [ideal(standard, port1=args.port1, port2=args.port2) for standard in standards]
+    ideals = [ideal(standard, port1=port1_selection, port2=port2_selection) for standard in standards]
 
     cal = skrf.calibration.SOLT(
         ideals=ideals,
