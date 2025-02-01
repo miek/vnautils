@@ -73,8 +73,15 @@ class PNA:
                 raise RuntimeError("Unhandled data format")
     
         columns = np.array(values).reshape(1 + (2 * (port_count ** 2)), -1)
-        network = skrf.Network(f=columns[0])
-        network.s = columns[1:].T.copy().reshape(-1,2,4).view(complex)
+        frequencies = columns[0]
+        s_params = columns[1:]
+
+        # Swap position of S21/S12
+        s_params[[2, 4]] = s_params[[4, 2]]
+        s_params[[3, 5]] = s_params[[5, 3]]
+
+        network = skrf.Network(f=frequencies)
+        network.s = s_params.T.copy().reshape(-1,2,4).view(complex)
         return network
 
     # Format
