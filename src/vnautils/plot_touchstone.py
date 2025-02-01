@@ -14,7 +14,7 @@ def main():
     )
 
     parser.add_argument('filename', nargs='*')
-    parser.add_argument('-t', '--type', choices=['smith', 'mag', 'phase'], default='smith')
+    parser.add_argument('-t', '--type', choices=['smith', 'mag', 'phase', 'unwrapped'], default='smith')
     parser.add_argument('-o', '--output', type=pathlib.Path)
     parser.add_argument('-n', type=int)
     parser.add_argument('-m', type=int)
@@ -33,6 +33,8 @@ def main():
             n.plot_s_db(n=args.n, m=args.m)
         elif args.type == 'phase':
             n.plot_s_deg(n=args.n, m=args.m)
+        elif args.type == 'unwrapped':
+            n.plot_s_deg_unwrap(n=args.n, m=args.m)
         else:
             print("Unknown plot type {args.type}")
             sys.exit(1)
