@@ -35,6 +35,10 @@ class PNA:
         rm = pyvisa.ResourceManager('@py')
         self.inst = rm.open_resource(f"TCPIP0::{hostname}::{port}::SOCKET")
         self.inst.read_termination = "\n"
+        timeout = 2 * 1000 + 10
+
+        old_timeout = self.inst.timeout
+        self.inst.timeout = timeout * 1000
 
         manufacturer, model, *_ = self.read('*IDN?').split(",")
         if not model in self._supported_models:
