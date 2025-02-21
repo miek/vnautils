@@ -183,8 +183,7 @@ def main():
     pna.select_cal_set(CAL_SET_NAME)
     for key, item in eterm_map.items():
         values = cal.coefs_12term[key].copy().view(float)
-        term_str = ",".join(np.format_float_scientific(f) for f in values)
-        pna.inst.write(f":SENS:CORR:CSET:DATA {item},{term_str}")
+        pna.inst.write_binary_values(f":SENS:CORR:CSET:DATA {item},", values, datatype='f')
 
     pna.activate_cal_set(CAL_SET_NAME)
 

@@ -31,7 +31,7 @@ class PNA:
     
     data_format = None
 
-    def __init__(self, hostname="pna.lan", port=5025, use_binary_transfers=False):
+    def __init__(self, hostname="pna.lan", port=5025, use_binary_transfers=True):
         rm = pyvisa.ResourceManager('@py')
         self.inst = rm.open_resource(f"TCPIP0::{hostname}::{port}::SOCKET")
         self.inst.read_termination = "\n"
