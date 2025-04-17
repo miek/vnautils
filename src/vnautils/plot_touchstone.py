@@ -14,7 +14,7 @@ def main():
     )
 
     parser.add_argument('filename', nargs='*')
-    parser.add_argument('-t', '--type', choices=['smith', 'mag', 'phase', 'unwrapped'], default='smith')
+    parser.add_argument('-t', '--type', choices=['smith', 'mag', 'phase', 'unwrapped', 'time_step'], default='smith')
     parser.add_argument('-o', '--output', type=pathlib.Path)
     parser.add_argument('-n', type=int)
     parser.add_argument('-m', type=int)
@@ -36,6 +36,8 @@ def main():
             n.plot_s_deg(n=args.n, m=args.m)
         elif args.type == 'unwrapped':
             n.plot_s_deg_unwrap(n=args.n, m=args.m)
+        elif args.type == 'time_step':
+            n.extrapolate_to_dc(kind='linear').plot_z_time_step(0, 0)
         else:
             print("Unknown plot type {args.type}")
             sys.exit(1)
