@@ -18,6 +18,7 @@ def main():
     parser.add_argument('-o', '--output', type=pathlib.Path)
     parser.add_argument('-n', type=int)
     parser.add_argument('-m', type=int)
+    parser.add_argument('-l', '--log', action='store_true')
 
     args = parser.parse_args()
 
@@ -30,7 +31,7 @@ def main():
         if args.type == 'smith':
             n.plot_s_smith(marker='.', n=args.n, m=args.m)
         elif args.type == 'mag':
-            n.plot_s_db(n=args.n, m=args.m)
+            n.plot_s_db(n=args.n, m=args.m, logx=args.log)
         elif args.type == 'phase':
             n.plot_s_deg(n=args.n, m=args.m)
         elif args.type == 'unwrapped':
