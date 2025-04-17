@@ -37,7 +37,7 @@ def main():
         elif args.type == 'unwrapped':
             n.plot_s_deg_unwrap(n=args.n, m=args.m)
         elif args.type == 'time_step':
-            n.extrapolate_to_dc(kind='linear').plot_z_time_step(0, 0)
+            n.extrapolate_to_dc(kind='linear').plot_z_time_step(n=args.n, m=args.m)
         else:
             print("Unknown plot type {args.type}")
             sys.exit(1)
